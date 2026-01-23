@@ -1,0 +1,60 @@
+@csrf_exempt
+def receive_event(request):
+    logger.warning("=== receive_event called ===")
+    logger.warning(f"Request method: {request.method}")
+    logger.warning(f"Content-Type: {request.content_type}")
+    logger.warning(f"Raw body: {request.body}")
+
+    if request.method != "POST":
+        logger.warning("Rejected: method not allowed")
+        return JsonResponse({"error": "method not allowed"}, status=405)
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+        logger.warning(f"Parsed data: {data}")
+    except Exception as e:
+        logger.exception("JSON parse failed")
+        return JsonResponse({"error": "invalid json"}, status=400)
+
+    # —— 必填字段校验（字段名不变）——
+    required_fields = ["uid", "session_id", "event_type", "payload", "created_at"]
+    for f in required_fields:
+        if f not in data:
+            logger.warning(f"Rejected: missing field {f}")
+            return JsonResponse({"error": f"missing {f}"}, status=400)
+
+    # —— created_at 兜底处理（关键修复点）——
+    created_at = None
+    if data["created_at"]:
+        created_at = parse_datetime(data["created_at"])
+        logger.warning(f"Parsed created_at: {created_at}")
+
+    if created_at is None:
+        # ⚠️ 不再 reject，直接兜底当前时间
+        created_at = timezone.now()
+        logger.warning(f"created_at missing or invalid, using timezone.now(): {created_at}")
+
+    # —— 确保玩家存在（关键新增）——
+    player, created = PlayerBasic.objects.get_or_create(
+        uid=data["uid"],
+        defaults={
+            "username": f"user_{data['uid']}",
+            "register_time": created_at,
+            "last_login": created_at,
+        }
+    )
+
+    if created:
+        logger.warning(f"PlayerBasic created uid={data['uid']}")
+
+    # —— 入库 ——（字段名完全不变）
+    action = ActionLog.objects.create(
+        uid=data["uid"],
+        session_id=data["session_id"],
+        event_type=data["event_type"],
+        payload=data["payload"],
+        created_at=created_at,
+    )
+    logger.warning(f"ActionLog created with id={action.id}")
+
+    return JsonResponse({"status": "ok"})

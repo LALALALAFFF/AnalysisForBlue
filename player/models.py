@@ -87,7 +87,7 @@ class ActionLog(models.Model):
     event_type = models.CharField(max_length=50)
     payload = models.JSONField()
 
-    created_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
     received_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

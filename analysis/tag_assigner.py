@@ -1,27 +1,42 @@
-from analysis.models import TagCategory, Tag, PlayerTagMapping
+#from analysis.models import TagCategory, Tag, PlayerTagMapping
 
 
-def assign_tags_for_player(player_id: int, feature_vector: dict):
+from analysis.models import (
+    TagCategory,
+    Tag,
+    PlayerTagMapping,
+    PlayerFeatureVector,
+)
+
+
+def run_assign_tags():
     """
-    根据特征向量为玩家打标签
+    为所有拥有特征向量的玩家打标签
     """
-    for category in TagCategory.objects.all():
-        value = feature_vector.get(category.code)
-        if value is None:
-            continue
+    # 取所有玩家特征向量
+    feature_vectors = PlayerFeatureVector.objects.select_related("player")
 
-        tag = (
-            Tag.objects
-            .filter(category=category)
-            .filter(min_value__lte=value, max_value__gt=value)
-            .first()
-        )
+    for fv in feature_vectors:
+        player_id = fv.player_id
+        feature_vector = fv.behavior_vector or {}
 
-        if not tag:
-            continue
+        for category in TagCategory.objects.all():
+            value = feature_vector.get(category.code)
+            if value is None:
+                continue
 
-        PlayerTagMapping.objects.update_or_create(
-            player_id=player_id,
-            category=category,
-            defaults={"tag": tag}
-        )
+            tag = (
+                Tag.objects
+                .filter(category=category)
+                .filter(min_value__lte=value, max_value__gt=value)
+                .first()
+            )
+
+            if not tag:
+                continue
+
+            PlayerTagMapping.objects.update_or_create(
+                player_id=player_id,
+                category=category,
+                defaults={"tag": tag}
+            )

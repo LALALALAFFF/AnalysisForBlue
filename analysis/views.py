@@ -17,6 +17,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from analysis.models import PlayerBasic
 from analysis.tasks import save_event_async
+from analysis.models import PlayerClusterProfile
 # ==============================
 # 接收模拟平台事件（核心接口）
 # ==============================
@@ -181,49 +182,92 @@ class AprioriAnalysis(APIView):
 
 
 # 1) 标签分布
+LEVEL_MAP_CN = {
+    "low": "低活跃",
+    "medium": "中活跃",
+    "high": "高活跃"
+}
+
+
 def tag_distribution(request):
+
+    dimensions = {
+        "消费等级": "spender_tag",
+        "活跃等级": "activity_tag",
+        "抽卡等级": "gacha_tag",
+        "任务等级": "skill_tag",
+    }
+
     result = []
 
-    for category in TagCategory.objects.all():
+    for name, field in dimensions.items():
+
         data = (
-            PlayerTagMapping.objects
-            .filter(category=category)
-            .values("tag__name")
+            PlayerClusterProfile.objects
+            .values(field)
             .annotate(count=Count("id"))
         )
 
+        chart_data = []
+
+        for item in data:
+            level = item[field]
+            cn_label = LEVEL_MAP_CN.get(level, level)
+
+            chart_data.append({
+                "name": cn_label,
+                "value": item["count"]
+            })
+
         result.append({
-            "category": category.name,
-            "code": category.code,
-            "data": [
-                {"name": item["tag__name"], "value": item["count"]}
-                for item in data
-            ]
+            "category": name,
+            "code": field,
+            "data": chart_data
         })
 
     return JsonResponse({"data": result})
 
 
 # 2) 玩家个人标签
-def player_tags(request, player_id):
-    mappings = (
-        PlayerTagMapping.objects
-        .filter(player_id=player_id)
-        .select_related("category", "tag")
-    )
+LEVEL_MAP_CN = {
+    "low": "低",
+    "medium": "中",
+    "high": "高"
+}
 
-    data = {}
-    for m in mappings:
-        data[m.category.name] = m.tag.name
+
+def player_tags(request, player_id):
+
+    profile = PlayerClusterProfile.objects.filter(player_id=player_id).first()
+
+    if not profile:
+        return JsonResponse({"tags": {}})
+
+    data = {
+        "消费能力": LEVEL_MAP_CN.get(profile.spender_tag, ""),
+        "活跃程度": LEVEL_MAP_CN.get(profile.activity_tag, ""),
+        "抽卡偏好": LEVEL_MAP_CN.get(profile.gacha_tag, ""),
+        "任务投入": LEVEL_MAP_CN.get(profile.skill_tag, ""),
+    }
 
     return JsonResponse({
         "player_id": player_id,
         "tags": data
     })
-#去前端控制启动特征生成、打标签接口
+#去前端控制启动特征生成、聚类打标签接口
 def run_build_feature(request):
-    call_command("build_features")
-    return JsonResponse({"msg": "特征向量生成完成"})
+    try:
+        call_command("build_features")
+        return JsonResponse({"status": 200, "msg": "特征向量生成完成"})
+    except Exception as e:
+        return JsonResponse({"status": 500, "error": str(e)})
+
+def run_dimension_cluster_api(request):
+    try:
+        call_command("run_dbscan")
+        return JsonResponse({"msg": "维度聚类完成"})
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 def run_assign_tags(request):
@@ -232,12 +276,21 @@ def run_assign_tags(request):
 
 #开关定时任务
 def set_task_switch(request):
-    task = request.GET.get("task")  # build_feature / run_tags
+
+    task = request.GET.get("task")
     enabled = request.GET.get("enabled") == "true"
+    interval = int(request.GET.get("interval", 1))
 
     obj, _ = SystemTaskSwitch.objects.update_or_create(
         task_name=task,
-        defaults={"enabled": enabled}
+        defaults={
+            "enabled": enabled,
+            "interval_minutes": interval
+        }
     )
 
-    return JsonResponse({"task": task, "enabled": obj.enabled})
+    return JsonResponse({
+        "task": obj.task_name,
+        "enabled": obj.enabled,
+        "interval": obj.interval_minutes
+    })

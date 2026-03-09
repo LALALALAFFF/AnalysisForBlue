@@ -152,3 +152,12 @@ INSTALLED_APPS += ["django_crontab"]
 CRONJOBS = [
     ("*/10 * * * *", "analysis.task_scheduler.run_scheduled_tasks"),
 ]
+#定时运行任务
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    "analysis-runner": {
+        "task": "analysis.tasks_scheduler.scheduled_analysis_runner",
+        "schedule": 60.0,  # 每 60 秒执行一次检查
+    },
+}

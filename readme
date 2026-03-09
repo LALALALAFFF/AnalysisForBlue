@@ -126,6 +126,9 @@ redis-server
 
 ③ 启动 Celery Worker（吃 Redis 队列）
 celery -A analysis worker -l info -P solo
+⚠️ 必须同时启动
+celery -A analysis worker -l info
+celery -A analysis beat -l info
 
 ④ 启动 Kafka Consumer（桥梁）
 python analysis/kafka/consumer.py

@@ -36,11 +36,11 @@
         <el-tag
           v-for="(tag, category) in userTags"
           :key="category"
-          type="success"
+          :type="getTagType(tag)"
           effect="dark"
         >
-          {{ category }}：{{ tag }}
-        </el-tag>
+        {{ category }}：{{ tag }}
+      </el-tag>
       </div>
     </el-card>
 
@@ -106,7 +106,12 @@ const loadGlobalTags = async () => {
     })
   })
 }
-
+const getTagType = (tag) => {
+  if (tag === "低") return "success"   // 绿色
+  if (tag === "中") return "warning"   // 橙色
+  if (tag === "高") return "danger"    // 红色
+  return "info"
+}
 /* ======================
    ② 单个玩家标签
 ====================== */

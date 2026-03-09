@@ -1,10 +1,10 @@
 # analysis/management/commands/build_features.py
 
 from django.core.management.base import BaseCommand
-from analysis.services.feature_builder import build_player_features
+from analysis.services.feature_builder import build_all_player_features
 from player.models import PlayerBasic
 
-
+"""
 class Command(BaseCommand):
     help = "Build player feature vectors from ActionLog"
 
@@ -27,3 +27,22 @@ class Command(BaseCommand):
                 build_player_features(player.uid)
 
         self.stdout.write(self.style.SUCCESS("Feature building completed"))
+
+class Command(BaseCommand):
+    help = "Build player feature vectors for ALL players"
+
+    def handle(self, *args, **options):
+        self.stdout.write("Building features for ALL players...")
+        build_all_player_features()
+        self.stdout.write(self.style.SUCCESS("Feature building completed"))"""
+from django.core.management.base import BaseCommand
+from analysis.services.feature_builder import build_all_player_features
+
+
+class Command(BaseCommand):
+
+    help = "Build player feature vectors"
+
+    def handle(self, *args, **options):
+        build_all_player_features()
+        self.stdout.write(self.style.SUCCESS("Feature build done"))

@@ -35,7 +35,7 @@ class PlayerClusterResult(models.Model):
     score_vector = models.JSONField()
     update_time = models.DateTimeField()
     player_tag = models.CharField(max_length=50, default='', blank=True)
-
+    cluster_label = models.CharField(max_length=100, default="")
 
     def __str__(self):
         return f"{self.player.username}-Cluster:{self.cluster_id}"
@@ -94,8 +94,10 @@ class PlayerTagMapping(models.Model):
         unique_together = ("player_id", "category")
 
 class SystemTaskSwitch(models.Model):
-    task_name = models.CharField(max_length=50, unique=True)
+    task_name = models.CharField(max_length=50)
     enabled = models.BooleanField(default=False)
+    interval_minutes = models.IntegerField(default=10)
+    last_run_time = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.task_name}: {self.enabled}"
@@ -104,3 +106,56 @@ class Feature(models.Model):
     user_id = models.BigIntegerField(unique=True)
     vector = models.JSONField()
     updated_at = models.DateTimeField(auto_now=True)
+
+#历史特征
+class PlayerFeatureHistory(models.Model):
+    player = models.ForeignKey(PlayerBasic, on_delete=models.CASCADE)
+
+    total_play_time = models.FloatField()
+    login_count = models.IntegerField()
+    battle_count = models.IntegerField()
+    win_count = models.IntegerField()
+
+    total_consume = models.FloatField()
+    purchase_count = models.IntegerField()
+
+    behavior_time = models.JSONField()   # {"battle": 3000, "login": 50}
+    active_dates = models.JSONField()    # ["2026-02-20", "2026-02-21"]
+
+    snapshot_time = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-snapshot_time"]
+
+    def __str__(self):
+        return f"History-{self.player.uid}-{self.snapshot_time}"
+
+class PlayerClusterProfile(models.Model):
+    """
+    专门用于存储标签聚类结果（独立于原聚类系统）
+    """
+
+    player = models.ForeignKey(PlayerBasic, on_delete=models.CASCADE)
+
+    # 原始分数
+    spender_score = models.FloatField()
+    skill_score = models.FloatField()
+    activity_score = models.FloatField()
+    gacha_score = models.FloatField()
+
+    # 聚类等级（0/1/2）
+    spender_level = models.IntegerField()
+    skill_level = models.IntegerField()
+    activity_level = models.IntegerField()
+    gacha_level = models.IntegerField()
+
+    # 最终文字标签
+    spender_tag = models.CharField(max_length=50)
+    skill_tag = models.CharField(max_length=50)
+    activity_tag = models.CharField(max_length=50)
+    gacha_tag = models.CharField(max_length=50)
+
+    update_time = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "player_cluster_profile"
